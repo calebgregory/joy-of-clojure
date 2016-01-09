@@ -1,0 +1,112 @@
+# definitions
+
+__polymorphism__: the ability of a function or method to have
+different definitions depending on the type of the target object.
+
+# notes
+
+Clojure provides __polymorphism__ via both multimethods and protocols,
+and both mechanisms are more open and extensible than polymorphism in
+many languages.
+
+
+```
+(defprotocol Concatenable
+  (cat [this other]))
+
+(extend-type String
+  Concatenable
+  (cat [this other]
+    (.concat this other)))
+
+(cat "House" " of Leaves")
+;=> "House of Leaves"
+```
+^^^ defines a _protocol_ named `Concatenable` that groups one or
+more functions (in this case only one, `cat`) that define a set of
+functions provided. That means that the function `cat` will work
+for any object that fully satisfies the protocol `Concatenable`.
+We then _extend_ this protocol to the `String` class and define
+the specific implementation--a function body that concatenates the
+argument `other` onto the string `this`. We can also extend this
+protocol to another type:
+```
+(extend-type java.util.List
+  Concatenable
+  (cat [this other]
+    (concat this other)))
+(cat [1 2 3] [4 5 6])
+;=> (1 2 3 4 5 6)
+```
+
+
+vvv encapsulated at the level of the namespace `joy.chess` through
+the use of the `defn-` macro that creates the namespace private
+functions.  The command for using the `lookup` function in this
+case would be `(joy.chess/lookup (initial-board) "a1")`...
+```
+; NAMESPACE ENCAPSULATION
+
+(defn initial-board []
+  [\r \n \b \q \k \b \n \r
+   \p \p \p \p \p \p \p \p
+   \- \- \- \- \- \- \- \-
+   \- \- \- \- \- \- \- \-
+   \- \- \- \- \- \- \- \-
+   \- \- \- \- \- \- \- \-
+   \P \P \P \P \P \P \P \P
+   \R \N \B \Q \K \B \N \R])
+
+(def *file-key* \a)
+(def *rank-key* \0)
+
+(defn- file-component [file]
+  (- (int file) (int *file-key*)))
+
+(defn- rank-component [rank]
+  (* 8 (- 8 (- (int rank) (int *rank-key*)))))
+
+(defn- index [file rank]
+  (+ (file-component file) (rank-component rank)))
+
+(defn lookup [board pos]
+  (let [[file rank] pos]
+    (board (index file rank))))
+```
+alternatively, the use of lexical clojures provides more options
+for encapsulation: _block level encapsulation_, and _local
+encapsulation_, both of which effectively aggregate unimportant
+details within a smaller scope.
+```
+; BLOCK-LEVEL ENCAPSULATION
+
+(letfn [(index [file rank]
+          (let [f (- (int file) (int \a))
+                r (* 8 (- 8 (- (int rank) (int \0))))]))]
+  (defn lookup [board pos]
+    (let [[file rank] pos]
+      (board (index file rank)))))
+```
+It's often a good idea to aggregate relevant data, functions, and
+macros at their most specific scope. You\'d still call lookup as
+before, but now the acillary functions aren't readily visible to
+the larger enclosing scope - in this case, the namespace
+`joy.chess`.
+```
+; LOCAL ENCAPSULATION
+
+(defn lookup2 [board pos]
+  (let [[file rank] (map int pos)
+        [fc rc]     (map int [\a \0])
+        f           (- file fc)
+        r           (* 8 (- 8 (- rank rc)))
+        index       (+ f r)]
+    (board index)))
+```
+Finally, we've pulled all of the implementation-specific details
+into the body of the lookup function itself. This localizes the
+scope of the `index` function and all auxiliary values to only the
+relevant party -- `lookup2`. As a nice bonus, `lookup2` is simple
+and compact without sacrificing readability. But Clojure eschews
+the notion of data-hiding encapsulation featured prominently in
+most object-oriented languages.
